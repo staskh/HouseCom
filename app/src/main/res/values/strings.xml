@@ -1,3 +1,5 @@
 <resources>
     <string name="app_name">HouseCom</string>
+    <string name="loopbackIp">127.0.0.1</string>
+    <string name="multicastIp">224.0.0.1</string>
 </resources>

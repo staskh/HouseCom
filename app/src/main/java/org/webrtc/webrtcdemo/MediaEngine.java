@@ -105,7 +105,9 @@ public class MediaEngine implements VideoDecodeEncodeObserver {
     // Audio
   private VoiceEngine voe;
   private int audioChannel;
-  private boolean audioEnabled;
+  //private boolean audioEnabled;
+  private boolean receiveAudio;
+  private boolean sendAudio;
   private boolean voeRunning;
   private int audioCodecIndex;
   private int audioTxPort;
@@ -235,7 +237,7 @@ public class MediaEngine implements VideoDecodeEncodeObserver {
   }
 
   public void start() {
-    if (audioEnabled) {
+    if (receiveAudio || sendAudio) {
       startVoE();
     }
     if (receiveVideo || sendVideo) {
@@ -284,25 +286,43 @@ public class MediaEngine implements VideoDecodeEncodeObserver {
 
   public void startVoE() {
     check(!voeRunning, "VoE already started");
-    check(voe.startListen(audioChannel) == 0, "Failed StartListen");
-    check(voe.startPlayout(audioChannel) == 0, "VoE start playout failed");
-    check(voe.startSend(audioChannel) == 0, "VoE start send failed");
+    if(receiveAudio) {
+      check(voe.startPlayout(audioChannel) == 0, "VoE start playout failed");
+    }
+    if(sendAudio) {
+      check(voe.startListen(audioChannel) == 0, "Failed StartListen");
+      check(voe.startSend(audioChannel) == 0, "VoE start send failed");
+    }
     voeRunning = true;
   }
 
   private void stopVoe() {
     check(voeRunning, "VoE not started");
-    check(voe.stopSend(audioChannel) == 0, "VoE stop send failed");
-    check(voe.stopPlayout(audioChannel) == 0, "VoE stop playout failed");
-    check(voe.stopListen(audioChannel) == 0, "VoE stop listen failed");
+    if(sendAudio) {
+      check(voe.stopSend(audioChannel) == 0, "VoE stop send failed");
+      check(voe.stopListen(audioChannel) == 0, "VoE stop listen failed");
+    }
+    if(receiveAudio) {
+      check(voe.stopPlayout(audioChannel) == 0, "VoE stop playout failed");
+    }
     voeRunning = false;
   }
 
-  public void setAudio(boolean audioEnabled) {
-    this.audioEnabled = audioEnabled;
+//  public void setAudio(boolean audioEnabled) {
+//    this.audioEnabled = audioEnabled;
+//  }
+//
+//  public boolean audioEnabled() { return audioEnabled; }
+
+  public void setReceiveAudio(boolean receiveAudio) {
+    this.receiveAudio = receiveAudio;
   }
 
-  public boolean audioEnabled() { return audioEnabled; }
+  public boolean receiveAudio() { return receiveAudio; }
+
+  public void setSendAudio(boolean sendAudio) { this.sendAudio = sendAudio; }
+
+  public boolean sendAudio() { return sendAudio; }
 
   public int audioCodecIndex() { return audioCodecIndex; }
 
@@ -409,7 +429,7 @@ public class MediaEngine implements VideoDecodeEncodeObserver {
       return;
     }
     String debugDirectory = getDebugDirectory();
-    check(voe.startDebugRecording(debugDirectory +  String.format("/apm_%d.dat",
+    check(voe.startDebugRecording(debugDirectory + String.format("/apm_%d.dat",
                     System.currentTimeMillis())) == 0,
         "Failed starting debug");
   }
@@ -424,9 +444,9 @@ public class MediaEngine implements VideoDecodeEncodeObserver {
     }
     String debugDirectory = getDebugDirectory();
     check(voe.startRtpDump(videoChannel, debugDirectory +
-            String.format("/voe_%d.rtp", System.currentTimeMillis()),
-            VoiceEngine.RtpDirections.INCOMING) == 0,
-        "voe starting rtp dump");
+                            String.format("/voe_%d.rtp", System.currentTimeMillis()),
+                    VoiceEngine.RtpDirections.INCOMING) == 0,
+            "voe starting rtp dump");
   }
 
   private void updateAudioOutput() {
@@ -472,9 +492,13 @@ public class MediaEngine implements VideoDecodeEncodeObserver {
     if (!vieRunning) {
       return;
     }
-    check(vie.stopSend(videoChannel) == 0, "StopSend");
-    stopCamera();
-    check(vie.stopReceive(videoChannel) == 0, "StopReceive");
+    if (sendVideo) {
+      check(vie.stopSend(videoChannel) == 0, "StopSend");
+      stopCamera();
+    }
+    if(receiveVideo) {
+      check(vie.stopReceive(videoChannel) == 0, "StopReceive");
+    }
     if (externalCodec != null) {
       check(vie.deRegisterExternalReceiveCodec(videoChannel,
               VCM_VP8_PAYLOAD_TYPE) == 0,

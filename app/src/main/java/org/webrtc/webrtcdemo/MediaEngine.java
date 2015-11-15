@@ -498,16 +498,17 @@ public class MediaEngine implements VideoDecodeEncodeObserver {
     }
     if(receiveVideo) {
       check(vie.stopReceive(videoChannel) == 0, "StopReceive");
-    }
-    if (externalCodec != null) {
-      check(vie.deRegisterExternalReceiveCodec(videoChannel,
-              VCM_VP8_PAYLOAD_TYPE) == 0,
-              "Failed to deregister external decoder");
-      externalCodec.dispose();
-      externalCodec = null;
-    } else {
-      check(vie.stopRender(videoChannel) == 0, "StopRender");
-      check(vie.removeRenderer(videoChannel) == 0, "RemoveRenderer");
+
+      if (externalCodec != null) {
+        check(vie.deRegisterExternalReceiveCodec(videoChannel,
+                        VCM_VP8_PAYLOAD_TYPE) == 0,
+                "Failed to deregister external decoder");
+        externalCodec.dispose();
+        externalCodec = null;
+      } else {
+        check(vie.stopRender(videoChannel) == 0, "StopRender");
+        check(vie.removeRenderer(videoChannel) == 0, "RemoveRenderer");
+      }
     }
     svRemote = null;
     vieRunning = false;

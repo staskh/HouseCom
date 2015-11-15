@@ -4,8 +4,11 @@ import android.media.AudioManager;
 import android.os.Bundle;
 import android.support.v7.app.AppCompatActivity;
 import android.util.Log;
+import android.view.MotionEvent;
 import android.view.SurfaceView;
+import android.view.View;
 import android.view.WindowManager;
+import android.widget.Button;
 import android.widget.LinearLayout;
 
 import org.webrtc.webrtcdemo.MediaEngine;
@@ -18,7 +21,11 @@ public class MainActivity extends AppCompatActivity {
     private NativeWebRtcContextRegistry contextRegistry = null;
     private MediaEngine mediaEngine = null;
 
-    private LinearLayout llRemoteSurface;
+    private LinearLayout llSurface;
+    private Button  btnCall;
+
+    private boolean inTransmitMode = false;
+    private boolean inReceiveMode = false;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -84,10 +91,92 @@ public class MainActivity extends AppCompatActivity {
          */
 
         setContentView(R.layout.activity_main);
+        llSurface = (LinearLayout) findViewById(R.id.llSurfaceView);
+        btnCall = (Button) findViewById(R.id.btnCall);
 
-        mediaEngine.setViewSelection(getResources().getInteger(
-                R.integer.surfaceView));
+        // have to be called after setContentView
+        // mediaEngine.setViewSelection(getResources().getInteger(R.integer.surfaceView));
         mediaEngine.setRemoteIp(getResources().getString(R.string.multicastIp));
+
+
+        btnCall.setOnTouchListener(new View.OnTouchListener() {
+            @Override
+            public boolean onTouch(View v, MotionEvent event) {
+                switch (event.getAction()) {
+                    case MotionEvent.ACTION_DOWN:
+                        Log.d(TAG, "ACTION_DOWN");
+                        startTransmit();
+                        return false;
+                    //break;
+                    case MotionEvent.ACTION_UP:
+                        Log.d(TAG, "ACTION_UP");
+                        stopTransmit();
+                        return false;
+                    //break;
+                }
+                Log.d(TAG, "Touch Action = " + event.getAction());
+                return true;
+            }
+        });
+
+
+
+
+
+
+    }
+
+    private void startTransmit() {
+        if(inReceiveMode){
+            Log.e(TAG,"Attempt to transmit while in receive mode");
+            return;
+        }
+        if(inTransmitMode){
+            Log.e(TAG,"Already in transmit mode");
+            return;
+        }
+        // switch into transmit mode
+        mediaEngine.setReceiveVideo(false);
+        mediaEngine.setSendVideo(true);
+        mediaEngine.setReceiveAudio(false);
+        mediaEngine.setSendAudio(true);
+        // start engine receive
+        mediaEngine.start();
+
+        // map view to engine
+
+        SurfaceView localSurfaceView = mediaEngine.getLocalSurfaceView();
+        llSurface.addView(localSurfaceView);
+
+        inTransmitMode = true;
+        Log.i(TAG,"Transmit mode START");
+
+    }
+
+    private void stopTransmit() {
+        if(!inTransmitMode){
+            Log.e(TAG,"Not in transmit mode");
+            return;
+        }
+
+        SurfaceView localSurfaceView = mediaEngine.getLocalSurfaceView();
+        llSurface.removeView(localSurfaceView);
+
+        mediaEngine.stop();
+
+        inTransmitMode = false;
+        Log.i(TAG, "Transmit mode STOP");
+    }
+
+    private void startReceive() {
+        if(inTransmitMode){
+            Log.e(TAG,"Attempt to receive while in transmit mode");
+            return;
+        }
+        if(inReceiveMode){
+            Log.e(TAG,"Already in receive mode");
+            return;
+        }
 
         mediaEngine.setReceiveVideo(true);
         mediaEngine.setSendVideo(false);
@@ -98,21 +187,27 @@ public class MainActivity extends AppCompatActivity {
         mediaEngine.start();
 
         // map view to engine
-        llRemoteSurface = (LinearLayout) findViewById(R.id.llRemoteView);
-        SurfaceView remoteSurfaceView = mediaEngine.getRemoteSurfaceView();
-        llRemoteSurface.addView(remoteSurfaceView);
 
-        Log.i(TAG,"All Systems Run");
+        SurfaceView remoteSurfaceView = mediaEngine.getRemoteSurfaceView();
+        llSurface.addView(remoteSurfaceView);
+
+        inReceiveMode = true;
+        Log.i(TAG,"Receive mode START");
+    }
+
+    private void stopReceive() {
+
+        mediaEngine.stop();
+
+        SurfaceView remoteSurfaceView = mediaEngine.getRemoteSurfaceView();
+        llSurface.removeView(remoteSurfaceView);
+
+        inReceiveMode = false;
+        Log.i(TAG, "Receive mode STOP");
     }
 
     @Override
     public void onDestroy() {
-//        disableTimedStartStop();
-        SurfaceView remoteSurfaceView = mediaEngine.getRemoteSurfaceView();
-        llRemoteSurface.removeView(remoteSurfaceView);
-
-        mediaEngine.stop();
-
         mediaEngine.dispose();
         contextRegistry.unRegister();
         super.onDestroy();
